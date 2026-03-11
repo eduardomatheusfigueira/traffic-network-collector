@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #0072CE;
+  --color-background-light: #f8fafc;
+  --color-text-light: #1D1D1B;
+  --color-surface-light: rgba(255, 255, 255, 0.8);
+  --color-border-light: rgba(226, 232, 240, 0.8);
+  
+  --color-quadrant-green: #00873E;
+  --color-quadrant-blue: #0072CE;
+  --color-quadrant-red: #E30613;
+  --color-quadrant-yellow: #FFB81C;
+  
+  --font-display: Ubuntu, sans-serif;
+}
+
+@layer utilities {
+  .glass {
+    background: var(--color-surface-light);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--color-border-light);
+  }
+}
