@@ -14,7 +14,6 @@ const PORT = parseInt(process.env.PORT || '3000', 10);
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
-// Haversine formula to calculate distance between two points in meters
 /**
  * Calcula a distância entre duas coordenadas geográficas (lat/lon) em metros.
  * Utiliza a Fórmula de Haversine para levar em conta a curvatura da Terra.
@@ -145,13 +144,13 @@ app.post('/api/network', async (req, res) => {
       ? highwayTypes.join('|') 
       : 'primary|secondary|tertiary|trunk';
 
-    // Step 1: Geocode the city using Nominatim to get the OSM ID
+    // Passo 1: Geocodificar a cidade usando Nominatim para obter o ID do OpenStreetMap
     const nominatimUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city)}&format=json&limit=1`;
     let nominatimResponse;
     try {
       nominatimResponse = await axios.get(nominatimUrl, {
         headers: { 'User-Agent': 'AI-Studio-Applet/1.0' },
-        timeout: 15000 // 15 seconds timeout for geocoding
+        timeout: 15000 // Timeout de 15 segundos para a geocodificação
       });
     } catch (err: any) {
       console.error('Nominatim API error:', err.message);
@@ -172,7 +171,7 @@ app.post('/api/network', async (req, res) => {
       return res.status(400).json({ error: 'Found location is not a valid area (must be relation or way).' });
     }
 
-    // Step 2: Overpass QL query using the calculated area ID
+    // Passo 2: Executar consulta Overpass QL usando o ID de área calculado
     const query = `
       [out:json][timeout:45];
       area(${areaId})->.searchArea;
@@ -186,18 +185,18 @@ app.post('/api/network', async (req, res) => {
 
     const data = await callOverpassWithRetry(query);
     
-    // Process OSM data into segments
+    // Converte os dados brutos do OSM em segmentos estruturados
     const nodeMap = new Map();
     const ways = [];
     const nodeFrequencies = new Map();
 
-    // First pass: categorize elements
+    // Primeira iteração: separa e categoriza os elementos (nós e vias)
     for (const element of data.elements) {
       if (element.type === 'node') {
         nodeMap.set(element.id, { lat: element.lat, lon: element.lon });
       } else if (element.type === 'way') {
         ways.push(element);
-        // Count node frequencies to find intersections
+        // Conta a frequência de surgimento dos nós para identificar intersecções
         for (const nodeId of element.nodes) {
           nodeFrequencies.set(nodeId, (nodeFrequencies.get(nodeId) || 0) + 1);
         }
@@ -207,7 +206,7 @@ app.post('/api/network', async (req, res) => {
     const segments = [];
     let segmentCounter = 0;
 
-    // Second pass: break ways into segments
+    // Segunda iteração: quebra as vias contínuas em trechos/segmentos baseados nas intersecções
     for (const way of ways) {
       let currentSegmentNodes = [];
       
@@ -246,7 +245,7 @@ app.post('/api/network', async (req, res) => {
             });
           }
           
-          // Start next segment with the current node
+          // Inicia o próximo trecho com o nó atual (que foi o fim do anterior)
           currentSegmentNodes = [nodeId];
         }
       }
@@ -260,6 +259,50 @@ app.post('/api/network', async (req, res) => {
 });
 
 /**
+ * Função auxiliar para invocar a API TomTom com rotação fluida de chaves.
+ * Ela tenta usar as chaves em sequência até obter sucesso ou falhar em todas 
+ * caso ocorra limite de cota / requests (Erros HTTP 403 e 429).
+ */
+async function callTomTomWithKeyRotation(
+  urlBase: string, 
+  params: any, 
+  apiKeys: { id: string, name: string, value: string }[]
+): Promise<any> {
+  const keysToTry = apiKeys.length > 0 
+    ? apiKeys 
+    : [{ id: 'env', name: 'Environment Key', value: process.env.TOMTOM_API_KEY || '' }];
+
+  if (keysToTry.length === 0 || !keysToTry[0].value) {
+    throw new Error('Chave API TomTom não configurada.');
+  }
+
+  let lastError: any = null;
+
+  for (const keyObj of keysToTry) {
+    try {
+      const finalParams = { ...params, key: keyObj.value };
+      const response = await axios.get(urlBase, { params: finalParams });
+      return response;
+    } catch (err: any) {
+      const status = err.response?.status;
+      lastError = err;
+      
+      // Se o erro for limite de cota (403 Proibido / 429 Muitos Pedidos), tenta avançar para a próxima chave
+      if (status === 403 || status === 429) {
+        console.warn(`TomTom API Key "${keyObj.name}" quota exceeded or rejected (Status: ${status}). Trying next key...`);
+        continue;
+      }
+      
+      // Para erros diferentes ou de semântica de chamadas (400 Bad Request, 404 Not Found), lança a exceção direto
+      throw err;
+    }
+  }
+
+  // Se o laço terminar e todas falharem:
+  throw new Error(`Todas as chaves da API TomTom falharam. Último erro: ${lastError?.response?.data?.errorText || lastError?.message}`);
+}
+
+/**
  * ROTA 1.5: BUSCA DE REDE POR ROTA (A -> B)
  * Recebe origem e destino, converte em coordenadas (Nominatim), traça a rota ideal (TomTom),
  * e cruza a geometria dessa rota com as vias do OSM (Overpass) para enriquecer com 
@@ -267,19 +310,15 @@ app.post('/api/network', async (req, res) => {
  */
 app.post('/api/network/route', async (req, res) => {
   try {
-    const { origin, destination, travelMode, splitIntersections, apiKey: clientApiKey } = req.body;
+    const { origin, destination, travelMode, splitIntersections, apiKeys: clientApiKeys } = req.body;
     console.log(`Fetching route from "${origin}" to "${destination}"...`);
-    const apiKey = clientApiKey || process.env.TOMTOM_API_KEY;
+    const apiKeys = clientApiKeys || [];
 
     if (!origin || !destination) {
       return res.status(400).json({ error: 'Ponto de partida e chegada são necessários.' });
     }
 
-    if (!apiKey) {
-      return res.status(400).json({ error: 'Chave API TomTom não configurada.' });
-    }
-
-    // Helper for geocoding
+    // Função auxiliar para geocodificação de endereços via Nominatim
     const geocode = async (query: string) => {
       const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`;
       const response = await axios.get(url, {
@@ -299,11 +338,12 @@ app.post('/api/network/route', async (req, res) => {
     const startLoc = await geocode(origin);
     const endLoc = await geocode(destination);
 
-    // TomTom Routing
+    // Etapa de Roteamento consumindo o Endpoint da TomTom
     const ttMode = travelMode || 'car';
-    const ttUrl = `https://api.tomtom.com/routing/1/calculateRoute/${startLoc.lat},${startLoc.lon}:${endLoc.lat},${endLoc.lon}/json?key=${apiKey}&travelMode=${ttMode}&routeType=fastest`;
+    const ttUrlBase = `https://api.tomtom.com/routing/1/calculateRoute/${startLoc.lat},${startLoc.lon}:${endLoc.lat},${endLoc.lon}/json`;
+    const ttParams = { travelMode: ttMode, routeType: 'fastest' };
     
-    const ttResponse = await axios.get(ttUrl);
+    const ttResponse = await callTomTomWithKeyRotation(ttUrlBase, ttParams, apiKeys);
     const route = ttResponse.data.routes[0];
     if (!route) return res.status(404).json({ error: 'Nenhuma rota encontrada.' });
 
@@ -333,7 +373,7 @@ app.post('/api/network/route', async (req, res) => {
     // Lógica de Segmentação: Quebra a rota sempre que cruzar um nó (intersecção) real do OSM
     const lats = points.map(p => p.lat);
     const lons = points.map(p => p.lon);
-    // Increased bbox slightly and getting full way data
+    // Aumentamos levemente a caixa delimitadora (bounding box) para cobrir eventuais imprecisões do GPS
     const query = `
       [out:json][timeout:30];
       way["highway"~"primary|secondary|tertiary|trunk|motorway|residential"](${Math.min(...lats)-0.002},${Math.min(...lons)-0.002},${Math.max(...lats)+0.002},${Math.max(...lons)+0.002});
@@ -406,7 +446,7 @@ app.post('/api/network/route', async (req, res) => {
       currentSegmentPoints.push(p);
 
       if (i < points.length - 1) {
-        // Find if this point is an intersection
+        // Verifica se o ponto atual fica próximo a uma intersecção do OSM usando a distância tolerada (SNAP_DIST)
         const nearestNode = osmNodes.find(n => calculateDistance(p.lat, p.lon, n.lat, n.lon) < SNAP_DIST);
         
         if (nearestNode && currentSegmentPoints.length > 8) { 
@@ -433,7 +473,7 @@ app.post('/api/network/route', async (req, res) => {
       }
     }
     
-    // Last segment
+    // Lida com a criação e inserção do último segmento remanescente
     if (currentSegmentPoints.length > 1) {
       const len = calculateSegmentLength(currentSegmentPoints);
       const lastPoint = currentSegmentPoints[currentSegmentPoints.length - 1];
@@ -475,11 +515,13 @@ app.post('/api/network/route', async (req, res) => {
  */
 app.post('/api/traffic', async (req, res) => {
   try {
-    const { segments, departAt, apiKey: clientApiKey } = req.body;
-    const apiKey = clientApiKey || process.env.TOMTOM_API_KEY;
+    const { segments, departAt, apiKeys: clientApiKeys } = req.body;
+    const apiKeys = clientApiKeys || [];
 
-    if (!apiKey) {
-      return res.status(400).json({ error: 'TomTom API Key is not configured. Please provide it in settings.' });
+    if (!apiKeys || apiKeys.length === 0) {
+      if (!process.env.TOMTOM_API_KEY) {
+        return res.status(400).json({ error: 'TomTom API Key is not configured. Please provide it in settings.' });
+      }
     }
 
     if (!segments || !Array.isArray(segments)) {
@@ -502,7 +544,6 @@ app.post('/api/traffic', async (req, res) => {
           const url = `https://api.tomtom.com/routing/1/calculateRoute/${segment.start.lat},${segment.start.lon}:${segment.end.lat},${segment.end.lon}/json`;
           
           const params: any = {
-            key: apiKey,
             traffic: true,
             computeTravelTimeFor: 'all',
             routeType: 'fastest'
@@ -512,7 +553,7 @@ app.post('/api/traffic', async (req, res) => {
             params.departAt = departAt;
           }
 
-          const response = await axios.get(url, { params });
+          const response = await callTomTomWithKeyRotation(url, params, apiKeys);
 
           const summary = response.data.routes?.[0]?.summary;
           return {
@@ -537,7 +578,7 @@ app.post('/api/traffic', async (req, res) => {
       const batchResults = await Promise.all(batchPromises);
       results.push(...batchResults);
       
-      // Small delay to respect rate limits (TomTom allows 5 QPS on free tier)
+      // Adiciona um pequeno atraso (delay) entre os lotes para respeitar o limite de 5 QPS do plano gratuito da TomTom
       if (i + concurrencyLimit < maxSegments) {
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
