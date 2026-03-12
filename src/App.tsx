@@ -122,12 +122,14 @@ export default function App() {
     setError(null);
     setSegments([]);
 
+    const apiUrl = import.meta.env.VITE_API_URL || '';
+
     try {
       let response;
       if (searchMode === 'city') {
-        response = await axios.post('/api/network', { city });
+        response = await axios.post(`${apiUrl}/api/network`, { city });
       } else {
-        response = await axios.post('/api/network/route', { 
+        response = await axios.post(`${apiUrl}/api/network/route`, { 
           origin, 
           destination, 
           travelMode, 
@@ -168,7 +170,8 @@ export default function App() {
       
       for (let i = 0; i < segments.length; i += batchSize) {
         const batch = segments.slice(i, i + batchSize);
-        const response = await axios.post('/api/traffic', { 
+        const apiUrl = import.meta.env.VITE_API_URL || '';
+        const response = await axios.post(`${apiUrl}/api/traffic`, { 
           segments: batch, 
           departAt,
           apiKey: tomtomApiKey 
