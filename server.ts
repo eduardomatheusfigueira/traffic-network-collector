@@ -4,12 +4,14 @@ import axios from 'axios';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
+import cors from 'cors';
 
 dotenv.config();
 
 const app = express();
-const PORT = 3000;
+const PORT = parseInt(process.env.PORT || '3000', 10);
 
+app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
 // Haversine formula to calculate distance between two points in meters
