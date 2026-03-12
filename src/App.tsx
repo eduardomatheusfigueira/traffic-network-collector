@@ -326,9 +326,15 @@ export default function App() {
             </CardHeader>
             <CardContent className="pb-4 pt-0 px-4">
               <div className="flex flex-col gap-4">
-                <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                  <Key className="w-4 h-4 text-primary" />
-                  <span>Chaves API TomTom</span>
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                    <Key className="w-4 h-4 text-primary" />
+                    <span>Chaves API TomTom</span>
+                  </div>
+                  <p className="text-xs text-slate-500 mb-2">
+                    Obtenha sua chave gratuita no <a href="https://developer.tomtom.com/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">Portal do Desenvolvedor TomTom</a>. 
+                    Crie uma conta e registre um "App" para obter sua API Key.
+                  </p>
                 </div>
                 
                 <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
