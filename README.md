@@ -46,6 +46,33 @@ Este projeto é dividido em um front-end (React + Vite) e um back-end (Express +
 
 ---
 
+## 🌍 Como Fazer o Deploy (Produção)
+
+Como esta aplicação possui um Front-end (React) e um Back-end (Express/Node.js), a melhor estratégia de deploy gratuito é hospedar cada parte em um serviço otimizado:
+
+### 1. Deploy do Back-end (Render)
+1. Crie uma conta no [Render](https://render.com/).
+2. Crie um novo **Web Service** conectado ao seu GitHub.
+3. Configurações:
+   - **Environment**: `Node`
+   - **Build Command**: `npm install`
+   - **Start Command**: `npm start`
+4. Após o deploy, copie a URL gerada (ex: `https://seu-backend.onrender.com`).
+
+### 2. Deploy do Front-end (Netlify)
+1. Crie uma conta no [Netlify](https://www.netlify.com/).
+2. Adicione um novo site importando do seu GitHub.
+3. Configurações de Build:
+   - **Build command**: `npm run build`
+   - **Publish directory**: `dist`
+4. **⚠️ IMPORTANTE:** Adicione uma Variável de Ambiente:
+   - Vá em *Site configuration > Environment variables*
+   - Adicione a chave: `VITE_API_URL`
+   - Valor: A URL copiada do Render no passo anterior (sem a barra `/` no final).
+5. Faça o Deploy do site.
+
+---
+
 ## 🛠️ Como Usar (Guia Rápido)
 
 ### 1. Configurando a API Key
