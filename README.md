@@ -29,12 +29,14 @@ Este projeto é dividido em um front-end (React + Vite) e um back-end (Express +
    npm install
    ```
 
-3. Configure as variáveis de ambiente (opcional, mas recomendado). Crie um arquivo `.env` na raiz do projeto contendo sua chave da TomTom como fallback de segurança:
+### 3. Configurando as Variáveis de Ambiente
+Opcionalmente, você pode configurar uma chave de fallback no servidor. Crie um arquivo `.env` na raiz do projeto:
    ```env
-   TOMTOM_API_KEY=sua_chave_api_aqui
+   TOMTOM_API_KEY=sua_chave_api_principal_aqui
    ```
 
-4. Inicie o servidor em modo de desenvolvimento:
+### 4. Iniciando o Servidor
+Inicie o servidor em modo de desenvolvimento:
    ```bash
    npm run dev
    ```
@@ -75,8 +77,13 @@ Como esta aplicação possui um Front-end (React) e um Back-end (Express/Node.js
 
 ## 🛠️ Como Usar (Guia Rápido)
 
-### 1. Configurando a API Key
-Antes de realizar qualquer busca, clique no ícone de engrenagem **(⚙️)** no canto superior direito para abrir o painel de configurações. Insira sua **Chave API TomTom** e clique em "Aplicar Chave".
+### 1. Configurando as Chaves da API (Multi-Keys)
+Para garantir que suas requisições não sejam bloqueadas pelo limite diário do plano gratuito da TomTom, o sistema suporta o uso de **múltiplas chaves API com rotação automática**:
+1. Clique no ícone de engrenagem **(⚙️)** no canto superior direito para abrir o painel de configurações.
+2. Clique em **"+ Adicionar Chave"** para cada chave que você possuir.
+3. Defina um **Nome** amigável (ex: "Chave 1", "Conta Principal") e insira o respectivo **Valor** da chave.
+4. Clique em **"Aplicar Chaves"**.
+O sistema tentará usar a primeira chave da lista. Se ela atingir o limite (Erro 403 ou 429), ele tentará automaticamente a chave seguinte.
 
 ### 2. Escolhendo o Modo de Coleta
 No primeiro bloco da tela, escolha a aba correspondente ao formato da pesquisa:
