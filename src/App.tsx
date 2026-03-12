@@ -312,7 +312,7 @@ export default function App() {
       </header>
 
       {/* PAINEL DE CONFIGURAÇÕES (Retrátil) */}
-      <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isSettingsOpen ? 'max-h-96 opacity-100 mb-6' : 'max-h-0 opacity-0'}`}>
+      <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isSettingsOpen ? 'max-h-[600px] opacity-100 mb-6' : 'max-h-0 opacity-0'}`}>
         <div className="max-w-7xl mx-auto px-4 md:px-8 w-full">
           <Card className="border-primary/20 bg-blue-50/30 backdrop-blur-sm">
             <CardHeader className="py-3 px-4 flex flex-row items-center justify-between space-y-0">
